@@ -1,9 +1,4 @@
 
-# coding: utf-8
-
-# In[1]:
-
-
 # %load blncq.py
 import pygame
 import torch
@@ -40,8 +35,8 @@ stickW = 50
 cticker = pygame.time.Clock()
 testsc = pygame.display.set_mode((sx, sy))
 
-im_bg = pygame.image.load("../assets/bg.png").convert_alpha()
-im_st = pygame.image.load("../assets/pp.png").convert_alpha()
+im_bg = pygame.image.load("assets/bg.png").convert_alpha()
+im_st = pygame.image.load("assets/pp.png").convert_alpha()
 
 im_bg = pygame.transform.scale(im_bg, (sx,sy))
 im_st = pygame.transform.scale(im_st, (stickW, stickL))
@@ -119,10 +114,10 @@ class gameState():
     def getState(self):
         return np.stack((self.th, self.w, self.x, self.v) , axis=0)
 
-    def gameinit(self):
-        self.th = (np.random.rand()-0.5)*10
+    def gameinit(self, dis = 5):
+        self.th = (np.random.rand()-0.5)*2*dis
         self.w = 0.0
-        self.x = np.random.choice(range(tableL+100, tableR-100))
+        self.x = np.random.choice(range(tableL+200, tableR-200))
         self.v = np.random.rand()-0.5
         
 
@@ -136,9 +131,6 @@ game = gameState(1.0,0.0,400.0,0.0)
 #         break
 
     
-
-
-# In[2]:
 
 
 class Blcer(nn.Module):
@@ -162,7 +154,7 @@ vdlist = np.arange(19)-9
 
 
 try:
-    blcer = torch.load("../models/newBalancer.mdl")
+    blcer = torch.load("models/naewBalancer.mdl")
 except:
     print("No such model file to load")
     blcer = Blcer(4,19,10)
@@ -180,10 +172,10 @@ def xbut01(x,a):
     return rt
 
 
-nTrain = 100000
+nTrain = 10240000
 nPlaySteps = 400
 nOptSteps = 50
-nReplayMem = 100000
+nReplayMem = 10000
 batchSize = 40
 
 delta = 0.99
@@ -191,12 +183,8 @@ D = deque()
 
 lossCurve = []
 
-
-# In[3]:
-
-
-episilon = 0.5
-em = 0.01
+episilon = 0.1
+em = 0.0
 en = 1.0
 for epoch in range(nTrain):
     epochLoss = 0
@@ -212,7 +200,7 @@ for epoch in range(nTrain):
         s_tt, l_tt, one_frame = game.forward(vd)
         if l_tt == 0:
             r_t = -100
-            game.gameinit()
+            game.gameinit(0)
         else:
             r_t = 1 # +np.exp(-vd**2)
 
@@ -220,6 +208,10 @@ for epoch in range(nTrain):
         if len(D) > nReplayMem:
             D.popleft()
         ##
+        #if np.random.rand()<0.001:
+        #    game.gameinit(10)
+            
+        
     
     ##
     for t in range(nOptSteps):
@@ -275,18 +267,20 @@ for epoch in range(nTrain):
     ##
     if epoch%100 == 1:
         print("During Epoch %s we found the loss to be: %s" %  ( epoch, epochLoss.data[0]/nOptSteps))
-        lossCurve.append(loss.data[0])            
         torch.save(blcer, "../models/newBalancer.mdl")
-    
+    lossCurve.append(epochLoss.data[0]/nOptSteps)                
 plt.plot(lossCurve)
 plt.show()
 
+plt.plot(lossCurve)
+plt.gca().set_xlabel("%s-timeTraining round"%(nOptSteps))
+plt.gca().set_ylabel("Loss")
+plt.show()
 
-# In[4]:
-
+print(list(blcer.parameters()))
 
 try:
-    blcer2 = torch.load("../models/newBalancer.mdl")
+    blcer2 = torch.load("models/newBalancer.mdl")
 except:
     print("No such model file to load...")
 
@@ -307,17 +301,17 @@ def illusnet(game,blcmdl):
     # print(stat.data.numpy(),vd)
     stat, label, one_frame= game.forward(vd,disp=1)
     if label == 0:
-        game.gameinit()
+        game.gameinit(dis = 10)
     ##
     IPython.display.clear_output(wait = True)
     img.set_data(np.transpose(one_frame,(1,0,2)))
     img.autoscale()
-    axe.set_title(q_action)
+    axe.set_title("$\hat{Q}$ = %s"%(q_action))
     IPython.display.display(fig)
 ##
 
-game.gameinit()
-for i in range(1000):
+game.gameinit(40)
+for i in range(2000):
     illusnet(game, blcer2)
-    
-
+    if i%300 == 1:
+        game.gameinit(dis=20)
