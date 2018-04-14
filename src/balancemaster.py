@@ -1,3 +1,7 @@
+# coding: utf-8
+
+# In[5]:
+
 
 # %load blncq.py
 import pygame
@@ -133,6 +137,9 @@ game = gameState(1.0,0.0,400.0,0.0)
     
 
 
+# In[ ]:
+
+
 class Blcer(nn.Module):
     def __init__(self, inputN, outputN, hiddenN):
         super(Blcer, self).__init__()
@@ -171,7 +178,6 @@ def xbut01(x,a):
     rt[a] = 1
     return rt
 
-
 nTrain = 10240000
 nPlaySteps = 400
 nOptSteps = 50
@@ -182,6 +188,10 @@ delta = 0.99
 D = deque()
 
 lossCurve = []
+
+
+# In[ ]:
+
 
 episilon = 0.1
 em = 0.0
@@ -272,12 +282,24 @@ for epoch in range(nTrain):
 plt.plot(lossCurve)
 plt.show()
 
+
+# In[ ]:
+
+
 plt.plot(lossCurve)
 plt.gca().set_xlabel("%s-timeTraining round"%(nOptSteps))
 plt.gca().set_ylabel("Loss")
 plt.show()
 
+
+# In[ ]:
+
+
 print(list(blcer.parameters()))
+
+
+# In[15]:
+
 
 try:
     blcer2 = torch.load("models/newBalancer.mdl")
@@ -315,3 +337,119 @@ for i in range(2000):
     illusnet(game, blcer2)
     if i%300 == 1:
         game.gameinit(dis=20)
+
+
+# In[93]:
+
+
+# %load advancednn
+class ActionNN(nn.Module):
+    def __init__(self, ni, nh=10):
+        super(ActionNN, self).__init__()
+        self.inputN = ni
+        self.hiddenN = nh
+        self.fc1 = nn.Linear(ni, nh)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(nh, 1)
+    
+    ##
+    def forward(self, input):
+        out = self.fc1(input)
+        out = self.relu(out)
+        out = self.fc2(out)
+        return out
+    ##
+##
+
+class QValue(nn.Module):
+    def __init__(self, ni, nh=10):
+        super(QValue, self).__init__()
+        self.inputN = ni
+        self.fc1 = nn.Linear(ni, nh)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(nh,1)
+    ##
+    def farward(self, stateAction):
+        sa = stateAction
+        out = self.fc1(sa)
+        out = self.relu(out)
+        out = self.fc2(out)
+        return out
+    ##
+##
+
+netA = ActionNN(4)
+netQ = QValue(5)
+critS = nn.MSELoss()
+optimizerA = torch.optim.Adam(netA.parameters(), lr=1e-3)
+optimizerS = torch.optim.Adam(netQ.parameters(), lr = 1e-3)
+
+records = deque()
+recoMax = 50000
+
+def catsa(s,a):
+    return torch.cat([torch.Tensor(s), torch.Tensor(a)])
+
+game.gameinit()
+def repeatGame(g, ann, epochN=100):
+    for epoch in range(epochN):
+        s1 = g.getState()
+        a = ann(Variable(torch.FloatTensor(s1)))
+        
+        s2, label, oneframe = g.forward(a.data[0])
+        if label == 0:
+            r = -100
+            g.gameinit()
+        else:
+            r = 1
+        epochRecord = (s1, a, r, s2, label)
+        records.append(epochRecord)
+        if len(records) > recoMax:
+            records.popleft()
+##
+repeatGame(game,netA)
+
+
+# In[31]:
+
+
+epochN = 1000
+batchSize = 40
+stepQ = 30
+stepA = 30
+
+for epoch in range(epochN):
+    if epoch % 100 == 0:
+        repeatGame(game, netA)
+
+    for epoch in range(stepQ):
+        minibatch = random.sample(records, batchSize)
+        qt = [ netQ(catsa(m[0], m[1])) for m in minibatch ]
+        qtt =[ netQ(catsa(m[3], netA(m[3]))) * m[4] for m in minibatch ]
+        rt = [m[2] for m in minibatch]
+
+    minibatch = random.sample(records, batchSize)
+    qt = []
+    qtt = []
+    
+    for m in minimatch:
+        qtsa = netQ(catsa(m[0], netS(m[0]))) 
+        qttsa = netQ(catsa(m[3], netS))
+
+    qt = [netQ(m[0]) for m in minibatch]
+    qtt = []
+    
+    for i in range(batchSize):
+        asd = minibatch[i][4] * netQ(minibatch[i][3])
+        asd.requires_grad = False
+        qtt.append(asd)
+    ##
+    
+
+
+              
+
+
+
+torch.Tensor(torch.randn([3,4]))
+
